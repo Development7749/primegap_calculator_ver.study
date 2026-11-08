@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>素数集計機</title>
+</head>
+<body>
+<main>
+  <h1></h1>
+  <p class="lead"></p>
+
+  <section class="panel">
+    <label for="n"></label>
+    <div class="row">
+      <input id="n" type="text" inputmode="numeric" value="100" autocomplete="off">
+      <button id="go" type="button">計算する</button>
+    </div>
+    <p class="err" id="err" role="alert"></p>
+    <p class="hint"></p>
+  </section>
+
+  <section id="out" hidden>
+    <div class="stats">
+      <div class="stat"><small>素数の数</small><b id="cnt"></b></div>
+      <div class="stat"><small>素数密度</small><b id="den"></b><br><span id="pct"></span></div>
+      <div class="stat"><small>ギャップの種類 / 最大ギャップ</small><b id="kinds"></b><br><span id="maxg"></span></div>
+    </div>
+    <h2>ギャップの集計</h2>
+    <pre id="gaps"></pre>
+  </section>
+</main>
+
+<script>
+// ===== 計算部分 =====
+function analyze(N){
+
+    const natural = new Uint8Array(N + 1).fill(true);
+
+    natural[0] = false;
+    natural[1] = false;
+
+    for (let i = 2; i * i <= N; i++) {
+
+        if (natural[i] == true) {
+
+            for (let j = i; i * j <= N; j++) {
+
+                natural[i * j] = false;
+
+            }
+
+        }
+
+    }
+
+    let primes = [];
+
+    for (let i = 0; i < natural.length; i++) {
+
+        if (natural[i] == true) {
+
+            primes.push(i);
+
+        }
+
+    }
+
+    let gaps = [];
+
+    for (let i = 1; i < primes.length; i++) {
+
+        gaps.push(primes[i] - primes[i - 1])
+
+    }
+
+    const countMap = new Map();
+
+    for (const item of gaps) {
+
+        countMap.set(item, (countMap.get(item) || 0) + 1);
+
+    }
+
+    return { count: primes.length, gaps: countMap };
+}
+
+// ===== 画面部分 =====
+const MAX_N = 2500000000;
+const $ = id => document.getElementById(id);
+const fmt = x => x.toLocaleString("ja-JP");
+
+function run(){
+  $("err").textContent = "";
+  const raw = $("n").value.replace(/[,\s]/g, "").replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  if (!/^\d+$/.test(raw)){ $("err").textContent = "整数で入力してください。"; return; }
+  const N = Number(raw);
+  if (N < 2 || N > MAX_N){ $("err").textContent = "2以上 " + fmt(MAX_N) + " 以下の整数にしてください。"; return; }
+
+  $("go").disabled = true; $("go").textContent = "計算中…";
+  setTimeout(() => {
+    try { show(N, analyze(N)); }
+    catch (e) { $("err").textContent = "計算できませんでした。Nを小さくしてください。"; }
+    $("go").disabled = false; $("go").textContent = "計算する";
+  }, 20);
+}
+
+function show(N, r){
+  const list = [...r.gaps.entries()].sort((a, b) => a[0] - b[0]);
+  const total = list.reduce((s, [, c]) => s + c, 0);
+  const top = Math.max(1, ...list.map(([, c]) => c));
+  const maxGap = list.length ? list[list.length - 1][0] : 0;
+  const density = r.count / N;
+
+  $("cnt").textContent = fmt(r.count) + " 個";
+  $("den").textContent = density.toFixed(6);
+  $("pct").textContent = "約 " + (density * 100).toFixed(3) + " %";
+  $("kinds").textContent = list.length + " 種類";
+  $("maxg").textContent = list.length ? "最大ギャップ " + fmt(maxGap) : "ギャップなし（素数が1個）";
+
+  const box = $("gaps");
+
+box.textContent = "\n";
+
+for (const [g, c] of list) {
+    box.textContent += fmt(g) + " : " + fmt(c) + "\n";
+}
+  }
+  $("out").hidden = false;
+
+$("go").addEventListener("click", run);
+$("n").addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+run();
+</script>
+</body>
+</html>
